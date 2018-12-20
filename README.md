@@ -1,5 +1,7 @@
 # core-defense-js
 
+Running at https://sharp-aryabhata-8bef9f.netlify.com/
+
 ## Project setup
 ```
 npm install
