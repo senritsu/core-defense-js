@@ -220,19 +220,30 @@ export default {
       ellipse(this.context, pos, [10, 30], phi)
     },
     drawProjectiles () {
+      const { t } = this.frameInfo
+
       this.projectiles.forEach(projectile => {
         const { r, phi, radius } = projectile
 
         const pos = toCartesian([r, phi], [200, 200])
 
-        this.context.fillStyle = 'darkred'
-        ellipse(this.context, pos, radius)
+        if (pos.some(c => c < -radius || c > 400 + radius)) {
+          const markerPos = toCartesian([50, phi], [200, 200])
 
-        const distanceToCore = distance(pos, [200, 200]) - projectile.radius - 40
-        // const timeToCore = distanceToCore / projectile.v
+          const opacity = 0.15 + 0.15 * pulse(1, t)
+          this.context.fillStyle = `rgba(255, 0, 0, ${opacity})`
+          ellipse(this.context, markerPos, 5)
+        } else {
+          this.context.fillStyle = 'darkred'
 
-        this.context.fillStyle = 'white'
-        text(this.context, `${Math.round(distanceToCore)}`, pos, 14)
+          ellipse(this.context, pos, radius)
+
+          const distanceToCore = distance(pos, [200, 200]) - projectile.radius - 40
+          // const timeToCore = distanceToCore / projectile.v
+
+          this.context.fillStyle = 'white'
+          text(this.context, `${Math.round(distanceToCore)}`, pos, 14)
+        }
       })
     },
     drawUi () {
