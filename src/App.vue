@@ -7,7 +7,7 @@
       <button @click="setVariant('pure')" :class="{active: variant === 'pure'}">Pure JS + canvas</button>
       <button @click="setVariant('vue')" :class="{active: variant === 'vue'}">Vue + SVG + physics engine</button>
     </div>
-    <component :is="component" />
+    <component :is="component" :key="variant" />
   </div>
 </template>
 

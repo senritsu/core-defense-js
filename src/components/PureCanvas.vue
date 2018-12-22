@@ -6,7 +6,7 @@
       <p>Protect the core</p>
     </div>
     <div class="debug">
-      <input type="range" v-model.number="player.phi" min="0" max="360" step="1">
+      <!-- <input type="range" v-model.number="player.phi" min="0" max="360" step="1"> -->
       <span>frame: {{ frameInfo.frame }}</span>
       <span>t: {{ frameInfo.t }}</span>
       <span>dt: {{ frameInfo.dt }}</span>
@@ -19,42 +19,10 @@
 </template>
 
 <script>
-const random = {
-  int: (min, max) => Math.round(min + (max - min) * Math.random())
-}
-
-const clamp = (x, min = 0, max = 1) => Math.min(max, Math.max(min, x))
-
-const pulse = (d, t) => Math.sin(2 * Math.PI * t / (d * 1000))
-const deg2rad = Math.PI / 180
-const toCartesian = ([r, phi], center = [0, 0]) => {
-  const [x, y] = center
-  const phiRad = phi * deg2rad
-  return [
-    x + Math.cos(phiRad) * r,
-    y + Math.sin(phiRad) * r
-  ]
-}
-const distance = ([x1, y1], [x2, y2]) => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
-
-const ellipse = (context, [x, y], radius, rotation = 0) => {
-  radius = Array.isArray(radius)
-    ? radius
-    : [radius, radius]
-
-  context.beginPath()
-  context.ellipse(x, y, ...radius, rotation * deg2rad, 0, 2 * Math.PI)
-  context.fill()
-}
-
-const text = (context, text, pos, fontSize = 10, stroke = false) => {
-  context.font = `${fontSize}px sans-serif`
-  if (stroke) {
-    context.lineWidth = fontSize / 8
-    context.strokeText(text, ...pos)
-  }
-  context.fillText(text, ...pos)
-}
+import * as random from '@/random'
+import * as spawning from '@/spawning'
+import { toCartesian, distance, pulse, clamp } from '@/math'
+import { ellipse, text } from '@/canvas/drawing'
 
 const handleKeys = (event, handlers) => {
   if (event.repeat) return
@@ -84,7 +52,8 @@ export default {
       game: {
         over: false,
         health: 10,
-        score: 0
+        score: 0,
+        nextSpawn: 0
       },
       projectiles: [],
       stars: []
@@ -124,16 +93,24 @@ export default {
       requestAnimationFrame(this.update)
     },
     spawnProjectiles () {
-      const maxProjectiles = 3 + Math.floor(this.game.score * 0.2)
+      const { dt } = this.frameInfo
 
-      if (this.projectiles.length < maxProjectiles) {
-        this.projectiles.push({
-          r: random.int(250, 350),
-          phi: random.int(0, 360),
-          v: random.int(30, 80) + this.game.score,
-          vAngular: random.int(-30, 30),
-          radius: random.int(10, 20)
+      this.game.nextSpawn -= dt
+
+      if (this.game.nextSpawn <= 0) {
+        const type = random.choice(Object.keys(spawning))
+
+        const newProjectiles = spawning[type]()
+
+        const velocityDifficultyAdjustment = this.game.score / 100
+        newProjectiles.forEach(projectile => {
+          projectile.v += velocityDifficultyAdjustment * projectile.v
         })
+
+        this.projectiles.push(...newProjectiles)
+
+        const spawnDifficultyAdjustment = 1 / (0.05 * this.game.score + 1)
+        this.game.nextSpawn = random.int(3, 5) * spawnDifficultyAdjustment
       }
     },
     moveProjectiles () {
@@ -158,7 +135,7 @@ export default {
 
         if (distance(player, coords) < (15 + projectile.radius)) { // player collision
           this.game.score++
-        } else if (distance(coords, [200, 200]) < (40 + projectile.radius)) { // core collision
+        } else if (projectile.r < (40 + projectile.radius)) { // core collision
           this.game.health--
         } else {
           remaining.push(projectile)
@@ -230,7 +207,7 @@ export default {
         if (pos.some(c => c < -radius || c > 400 + radius)) {
           const markerPos = toCartesian([50, phi], [200, 200])
 
-          const opacity = 0.15 + 0.15 * pulse(1, t)
+          const opacity = 0.15 + 0.15 * pulse(60 / projectile.v, t)
           this.context.fillStyle = `rgba(255, 0, 0, ${opacity})`
           ellipse(this.context, markerPos, 5)
         } else {
@@ -316,14 +293,15 @@ export default {
     this.context = this.$refs.canvas.getContext('2d')
     this.$refs.canvas.focus()
   },
+  created () {
+    this.reset()
+
+    this.frameInfo.t = performance.now()
+    requestAnimationFrame(this.update)
+  },
   mounted () {
     this.context = this.$refs.canvas.getContext('2d')
     this.$refs.canvas.focus()
-
-    this.reset()
-
-    this.t = performance.now()
-    requestAnimationFrame(this.update)
   }
 }
 </script>
