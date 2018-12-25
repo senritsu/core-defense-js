@@ -50,7 +50,7 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
+  margin-top: 10px;
 
   display: flex;
   flex-direction: column;
@@ -58,7 +58,12 @@ export default {
 }
 
 h1 {
+  margin-top: 5px;
   margin-bottom: 0.2em;
+}
+
+canvas:focus {
+  outline: none;
 }
 
 .variant-selection {

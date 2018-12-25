@@ -1,6 +1,6 @@
 <template lang="html">
   <div class="pure-canvas">
-    <canvas ref="canvas" width="400" height="400" tabindex="1" @keydown="onKeyDown" @keyup="onKeyUp" @focus="onFocus" @blur="onBlur" />
+    <canvas ref="canvas" width="640" height="640" tabindex="1" @keydown="onKeyDown" @keyup="onKeyUp" @focus="onFocus" @blur="onBlur" />
     <div class="help">
       <p>[LeftArrow] + [RightArrow] to move</p>
       <p>Protect the core</p>
@@ -21,8 +21,8 @@
 <script>
 import * as random from '@/random'
 import * as spawning from '@/spawning'
-import { toCartesian, distance, pulse, clamp } from '@/math'
-import { ellipse, text } from '@/canvas/drawing'
+import { toCartesian, distance, pulse, clamp, mod } from '@/math'
+import { ellipse, text, arcSegment } from '@/canvas/drawing'
 
 const handleKeys = (event, handlers) => {
   if (event.repeat) return
@@ -88,7 +88,7 @@ export default {
         this.paused = true
       }
 
-      this.draw()
+      this.draw(this.context, this.frameInfo)
 
       requestAnimationFrame(this.update)
     },
@@ -128,12 +128,12 @@ export default {
     },
     handleCollisions () {
       const { r, phi } = this.player
-      const player = toCartesian([r, phi], [200, 200])
 
       this.projectiles = this.projectiles.reduce((remaining, projectile) => {
-        const coords = toCartesian([projectile.r, projectile.phi], [200, 200])
+        const dr = Math.abs(r - projectile.r)
+        const dPhi = Math.abs(mod(phi - projectile.phi + 180, 360) - 180)
 
-        if (distance(player, coords) < (15 + projectile.radius)) { // player collision
+        if (dr <= (projectile.radius + 5) && dPhi <= (projectile.radius + 22.5)) { // player collision
           this.game.score++
         } else if (projectile.r < (40 + projectile.radius)) { // core collision
           this.game.health--
@@ -143,33 +143,46 @@ export default {
         return remaining
       }, [])
     },
-    draw () {
-      this.context.textAlign = 'center'
-      this.context.textBaseline = 'middle'
-      this.context.font = '10px sans-serif'
+    draw (ctx, frameInfo) {
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = '10px sans-serif'
 
-      this.drawBackground()
-      this.drawCore()
-      this.drawProjectiles()
-      this.drawPlayer()
+      this.drawBackground(ctx, frameInfo)
 
-      this.drawUi()
+      ctx.ellipse(320, 320, 300, 300, 0, 0, 2 * Math.PI)
+      ctx.save()
+      ctx.clip()
+
+      this.drawCore(ctx, frameInfo)
+      this.drawProjectiles(ctx, frameInfo)
+      this.drawPlayer(ctx, frameInfo)
+
+      ctx.restore()
+
+      this.drawForeground(ctx, frameInfo)
+      this.drawUi(ctx, frameInfo)
     },
-    drawBackground () {
-      const { t } = this.frameInfo
-      this.context.fillStyle = 'black'
-      this.context.fillRect(0, 0, 400, 400)
+    drawBackground (ctx, { t }) {
+      ctx.fillStyle = 'black'
+      ellipse(ctx, [320, 320], 300)
 
-      this.context.fillStyle = '#fff8'
+      ctx.fillStyle = '#fff8'
       this.stars.forEach(star => {
-        const { x, y, radius, blinkDuration } = star
-        const r = 0.5 * radius + 0.49 * pulse(blinkDuration, t)
-        ellipse(this.context, [x, y], r)
+        const { r, phi, radius, blinkDuration } = star
+        const [x, y] = toCartesian([r, phi], [320, 320])
+        const animatedRadius = 0.5 * radius + 0.49 * pulse(blinkDuration, t)
+        ellipse(ctx, [x, y], animatedRadius)
       })
     },
-    drawCore () {
-      const { t } = this.frameInfo
-
+    drawForeground (ctx) {
+      ctx.beginPath()
+      ctx.strokeStyle = 'rgb(16, 20, 33)'
+      ctx.lineWidth = 10
+      ctx.ellipse(320, 320, 305, 305, 0, 0, 2 * Math.PI)
+      ctx.stroke()
+    },
+    drawCore (ctx, { t }) {
       const steps = {
         2: { color: '#f99', pulse: { magnitude: 2.2, duration: 0.8 } },
         5: { color: '#fdd', pulse: { magnitude: 1.5, duration: 1.5 } },
@@ -180,66 +193,62 @@ export default {
         if (this.game.health <= step) {
           const { color, pulse: { magnitude, duration } } = steps[step]
 
-          this.context.fillStyle = color
+          ctx.fillStyle = color
           const r = 40 + magnitude * pulse(duration, t)
-          ellipse(this.context, [200, 200], r)
+          ellipse(ctx, [320, 320], r)
 
           break
         }
       }
     },
-    drawPlayer () {
+    drawPlayer (ctx) {
       const { r, phi } = this.player
 
-      const pos = toCartesian([r, phi], [200, 200])
-
-      this.context.fillStyle = 'darkgreen'
-      ellipse(this.context, pos, [10, 30], phi)
+      ctx.strokeStyle = 'rgb(72, 161, 204)'
+      arcSegment(ctx, [320, 320], [r, r + 10], [phi - 22.5, phi + 22.5])
     },
-    drawProjectiles () {
-      const { t } = this.frameInfo
-
+    drawProjectiles (ctx, { t }) {
       this.projectiles.forEach(projectile => {
         const { r, phi, radius } = projectile
 
-        const pos = toCartesian([r, phi], [200, 200])
+        const pos = toCartesian([r, phi], [320, 320])
 
-        if (pos.some(c => c < -radius || c > 400 + radius)) {
-          const markerPos = toCartesian([50, phi], [200, 200])
+        if (r > 300 + radius) {
+          const markerPos = toCartesian([50, phi], [320, 320])
 
           const opacity = 0.15 + 0.15 * pulse(60 / projectile.v, t)
-          this.context.fillStyle = `rgba(255, 0, 0, ${opacity})`
-          ellipse(this.context, markerPos, 5)
+          ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`
+          ellipse(ctx, markerPos, 5)
         } else {
-          this.context.fillStyle = 'darkred'
+          ctx.fillStyle = 'darkred'
 
-          ellipse(this.context, pos, radius)
+          ellipse(ctx, pos, radius)
 
-          const distanceToCore = distance(pos, [200, 200]) - projectile.radius - 40
+          const distanceToCore = distance(pos, [320, 320]) - projectile.radius - 40
           // const timeToCore = distanceToCore / projectile.v
 
-          this.context.fillStyle = 'white'
-          text(this.context, `${Math.round(distanceToCore)}`, pos, 14)
+          ctx.fillStyle = 'white'
+          text(ctx, `${Math.round(distanceToCore)}`, pos, 14)
         }
       })
     },
-    drawUi () {
+    drawUi (ctx) {
       if (this.game.over) {
-        this.context.strokeStyle = 'black'
-        this.context.fillStyle = 'white'
+        ctx.strokeStyle = 'black'
+        ctx.fillStyle = 'white'
 
-        text(this.context, 'GAME OVER', [200, 200], 60, true)
+        text(ctx, 'GAME OVER', [320, 320], 60, true)
 
-        this.context.strokeStyle = 'black'
+        ctx.strokeStyle = 'black'
 
-        text(this.context, `Your score: ${this.game.score}!`, [200, 240], 25, true)
-        text(this.context, 'Press [Space] to play again', [200, 270], 25, true)
+        text(ctx, `Your score: ${this.game.score}!`, [200, 240], 25, true)
+        text(ctx, 'Press [Space] to play again', [200, 270], 25, true)
       } else {
-        this.context.fillStyle = 'white'
-        text(this.context, `Score: ${this.game.score}`, [200, 15], 25)
+        ctx.fillStyle = 'white'
+        text(ctx, `Score: ${this.game.score}`, [200, 15], 25)
 
-        this.context.fillStyle = 'black'
-        text(this.context, this.game.health, [200, 200], 35)
+        ctx.fillStyle = 'black'
+        text(ctx, this.game.health, [320, 320], 35)
       }
     },
     onKeyDown (event) {
@@ -282,8 +291,8 @@ export default {
       this.game.score = 0
       this.game.health = 10
       this.stars = new Array(random.int(80, 120)).fill(null).map(() => ({
-        x: random.int(0, 400),
-        y: random.int(0, 400),
+        r: random.int(0, 295),
+        phi: random.int(0, 360),
         radius: random.int(1, 3),
         blinkDuration: random.int(3, 8)
       }))

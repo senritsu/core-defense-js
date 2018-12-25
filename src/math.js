@@ -1,5 +1,7 @@
 export const clamp = (x, min = 0, max = 1) => Math.min(max, Math.max(min, x))
 
+export const mod = (x, n) => x - Math.floor(x / n) * n
+
 export const pulse = (d, t) => Math.sin(2 * Math.PI * t / (d * 1000))
 
 export const deg2rad = Math.PI / 180
