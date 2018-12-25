@@ -5,15 +5,15 @@
       <p>[LeftArrow] + [RightArrow] to move</p>
       <p>Protect the core</p>
     </div>
-    <div class="debug">
+    <div v-if="debug" class="debug">
       <!-- <input type="range" v-model.number="player.phi" min="0" max="360" step="1"> -->
       <span>frame: {{ frameInfo.frame }}</span>
       <span>t: {{ frameInfo.t }}</span>
       <span>dt: {{ frameInfo.dt }}</span>
       <span>player: {{ {r: player.r, phi: Math.round(player.phi), input: player.move} }}</span>
-      <!-- <span v-for="(projectile, i) in projectiles" :key="i">
+      <span v-for="(projectile, i) in projectiles" :key="i">
         Projectile {{i}}: {{ projectile.r }}
-      </span> -->
+      </span>
     </div>
   </div>
 </template>
@@ -56,7 +56,8 @@ export default {
         nextSpawn: 0
       },
       projectiles: [],
-      stars: []
+      stars: [],
+      debug: false
     }
   },
   methods: {
@@ -264,6 +265,9 @@ export default {
         },
         39: () => {
           this.player.move = clamp(this.player.move + 1, -1, 1)
+        },
+        68: () => {
+          this.debug = !this.debug
         }
       })
     },
